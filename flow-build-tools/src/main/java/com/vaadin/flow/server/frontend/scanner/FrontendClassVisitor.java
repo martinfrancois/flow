@@ -73,14 +73,17 @@ final class FrontendClassVisitor extends ClassVisitor {
 
         private final LinkedHashSet<String> target;
         private final LinkedHashSet<String> targetDevelopmentOnly;
+        private final LinkedHashSet<String> deprecatedRuntimeTarget;
         private final boolean isJavaScriptAnnotation;
 
         public JSAnnotationVisitor(LinkedHashSet<String> target,
                 LinkedHashSet<String> targetDevelopmentOnly,
-                boolean isJavaScriptAnnotation) {
+                boolean isJavaScriptAnnotation,
+                LinkedHashSet<String> deprecatedRuntimeTarget) {
             this.target = target;
             this.targetDevelopmentOnly = targetDevelopmentOnly;
             this.isJavaScriptAnnotation = isJavaScriptAnnotation;
+            this.deprecatedRuntimeTarget = deprecatedRuntimeTarget;
         }
 
         @Override
@@ -98,9 +101,21 @@ final class FrontendClassVisitor extends ClassVisitor {
         @Override
         public void visitEnd() {
             super.visitEnd();
-            if (currentModule != null && !isRuntimeJavaScript(currentModule)) {
+            if (currentModule != null) {
                 // This visitor is called also for the $Container annotation
-                if (currentDevOnly) {
+                boolean runtimeUrl = FrontendDependencyUrlResolver
+                        .isRuntimeDependencyUrl(currentModule);
+                if (isJavaScriptAnnotation && runtimeUrl) {
+                    // @JavaScript with a runtime prefix: load at runtime, not
+                    // bundled. No deprecation — this is the recommended form.
+                } else if (!isJavaScriptAnnotation && runtimeUrl) {
+                    // @JsModule with a runtime URL: keep working at runtime
+                    // via Page.addJsModule, but skip from the bundle and warn
+                    // users to migrate to @JavaScript.
+                    if (deprecatedRuntimeTarget != null) {
+                        deprecatedRuntimeTarget.add(currentModule);
+                    }
+                } else if (currentDevOnly) {
                     targetDevelopmentOnly.add(currentModule);
                 } else {
                     target.add(currentModule);
@@ -108,11 +123,6 @@ final class FrontendClassVisitor extends ClassVisitor {
             }
             currentModule = null;
             currentDevOnly = false;
-        }
-
-        private boolean isRuntimeJavaScript(String value) {
-            return isJavaScriptAnnotation && FrontendDependencyUrlResolver
-                    .isRuntimeDependencyUrl(value);
         }
 
     }
@@ -235,10 +245,11 @@ final class FrontendClassVisitor extends ClassVisitor {
         };
         // Visitor for @JsModule annotations
         jsModuleVisitor = new JSAnnotationVisitor(classInfo.modules,
-                classInfo.modulesDevelopmentOnly, false);
+                classInfo.modulesDevelopmentOnly, false,
+                classInfo.deprecatedRuntimeModules);
         // Visitor for @JavaScript annotations
         jScriptVisitor = new JSAnnotationVisitor(classInfo.scripts,
-                classInfo.scriptsDevelopmentOnly, true);
+                classInfo.scriptsDevelopmentOnly, true, null);
         // Visitor all other annotations
         annotationVisitor = new RepeatedAnnotationVisitor() {
             @Override

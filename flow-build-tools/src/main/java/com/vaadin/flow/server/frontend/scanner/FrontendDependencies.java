@@ -207,7 +207,8 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
     }
 
     private void warnAboutDeprecatedJavaScriptUses() {
-        Set<String> warnedKeys = new LinkedHashSet<>();
+        Set<String> warnedJavaScriptKeys = new LinkedHashSet<>();
+        Set<String> warnedJsModuleKeys = new LinkedHashSet<>();
         for (Entry<String, ClassInfo> entry : visitedClasses.entrySet()) {
             String className = entry.getKey();
             ClassInfo classInfo = entry.getValue();
@@ -215,8 +216,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                 continue;
             }
             for (String value : classInfo.scripts) {
-                String key = className + ':' + value;
-                if (warnedKeys.add(key)) {
+                if (warnedJavaScriptKeys.add(className + ':' + value)) {
                     log().warn(
                             "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
                                     + "Prepend context:// for runtime loading or migrate to @JsModule.",
@@ -224,12 +224,20 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                 }
             }
             for (String value : classInfo.scriptsDevelopmentOnly) {
-                String key = className + ':' + value;
-                if (warnedKeys.add(key)) {
+                if (warnedJavaScriptKeys.add(className + ':' + value)) {
                     log().warn(
                             "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
                                     + "Prepend context:// for runtime loading or migrate to @JsModule.",
                             className, value);
+                }
+            }
+            for (String value : classInfo.deprecatedRuntimeModules) {
+                if (warnedJsModuleKeys.add(className + ':' + value)) {
+                    log().warn(
+                            "@JsModule on {} with value \"{}\" is a runtime URL. "
+                                    + "@JsModule is for build-time bundle sources only; "
+                                    + "use @JavaScript(\"{}\") for runtime script loading.",
+                            className, value, value);
                 }
             }
         }

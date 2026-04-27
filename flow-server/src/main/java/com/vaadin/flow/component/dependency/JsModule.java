@@ -30,8 +30,8 @@ import com.vaadin.flow.component.Component;
  * <p>
  * This is a <em>build-time</em> dependency: the referenced file is a bundle
  * source, fed into Vite at build time, and is not served as a static resource
- * at runtime. Use {@link JavaScript} instead when the file should be served as
- * a plain {@code <script>} at runtime.
+ * at runtime. Use {@link JavaScript} for files that should be loaded at runtime
+ * (including external URLs and CDN-hosted scripts).
  * <p>
  * Source locations:
  * <ul>
@@ -49,6 +49,14 @@ import com.vaadin.flow.component.Component;
  * guaranteed at the class level (annotations on different classes may appear in
  * different orders relative to each other). {@code @JsModule} files load before
  * {@link JavaScript} and {@link CssImport}.
+ * <p>
+ * <b>Deprecated runtime URLs:</b> Historically, {@code @JsModule} also accepted
+ * runtime URLs ({@code http://}, {@code https://}, {@code //},
+ * {@code context://}, {@code base://}, {@code /…}); such values were loaded at
+ * runtime as {@code <script type="module">}. This is deprecated. Use
+ * {@link JavaScript} for runtime script loading. Existing runtime URLs in
+ * {@code @JsModule} keep working for backwards compatibility but are excluded
+ * from the bundle and emit a build-time warning.
  * <p>
  * NOTE: Currently all frontend resources are bundled together into one big
  * bundle. JavaScript files loaded by one class will therefore be present on a
@@ -72,12 +80,15 @@ public @interface JsModule {
      * JavaScript module to load before using the annotated {@link Component} in
      * the browser.
      * <p>
-     * The value is a bundler import specifier — typically a relative path (e.g.
-     * {@code "./my-element.js"}), an npm package specifier (e.g.
-     * {@code "@scope/pkg/foo.js"}), or an alias. It is not a URL: the
-     * {@code context://}, {@code base://}, and absolute URL prefixes that apply
-     * to {@link JavaScript} are not supported here. Use {@link JavaScript} for
-     * files that should be served as runtime scripts by the servlet container.
+     * The recommended value is a bundler import specifier — typically a
+     * relative path (e.g. {@code "./my-element.js"}), an npm package specifier
+     * (e.g. {@code "@scope/pkg/foo.js"}), or an alias. The bundler resolves
+     * these against the configured frontend directory.
+     * <p>
+     * Values with a runtime URL prefix ({@code http://}, {@code https://},
+     * {@code //}, {@code context://}, {@code base://}, or a leading {@code /})
+     * are deprecated; they are excluded from the bundle and emit a build-time
+     * warning. Migrate them to {@link JavaScript}.
      * <p>
      * NOTE: In the case of using JsModule with LitTemplate, the value needs to
      * point to a real file as it will be copied to the templates folder under
