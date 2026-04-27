@@ -135,6 +135,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
             computePackages();
             computePwaConfiguration();
             aggregateEntryPointInformation();
+            warnAboutDeprecatedJavaScriptUses();
             long ms = (System.nanoTime() - start) / 1000000;
             log().info("Visited {} classes. Took {} ms.", visitedClasses.size(),
                     ms);
@@ -203,6 +204,35 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
             }
         }
 
+    }
+
+    private void warnAboutDeprecatedJavaScriptUses() {
+        Set<String> warnedKeys = new LinkedHashSet<>();
+        for (Entry<String, ClassInfo> entry : visitedClasses.entrySet()) {
+            String className = entry.getKey();
+            ClassInfo classInfo = entry.getValue();
+            if (classInfo == null) {
+                continue;
+            }
+            for (String value : classInfo.scripts) {
+                String key = className + ':' + value;
+                if (warnedKeys.add(key)) {
+                    log().warn(
+                            "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
+                                    + "Prepend context:// for runtime loading or migrate to @JsModule.",
+                            className, value);
+                }
+            }
+            for (String value : classInfo.scriptsDevelopmentOnly) {
+                String key = className + ':' + value;
+                if (warnedKeys.add(key)) {
+                    log().warn(
+                            "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
+                                    + "Prepend context:// for runtime loading or migrate to @JsModule.",
+                            className, value);
+                }
+            }
+        }
     }
 
     Set<String> collectReachableClasses(EntryPointData entryPointData) {

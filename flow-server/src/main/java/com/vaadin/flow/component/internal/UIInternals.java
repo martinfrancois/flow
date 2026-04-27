@@ -83,6 +83,7 @@ import com.vaadin.flow.router.internal.AfterNavigationHandler;
 import com.vaadin.flow.router.internal.BeforeEnterHandler;
 import com.vaadin.flow.router.internal.BeforeLeaveHandler;
 import com.vaadin.flow.server.Command;
+import com.vaadin.flow.server.FrontendDependencyUrlResolver;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.communication.PushConnection;
@@ -1054,14 +1055,24 @@ public class UIInternals implements Serializable {
             triggerChunkLoading(componentClass);
         }
 
-        dependencies.getStyleSheets().forEach(styleSheet -> page
-                .addStyleSheet(styleSheet.value(), styleSheet.loadMode()));
+        dependencies.getStyleSheets().forEach(styleSheet -> {
+            String resolved = FrontendDependencyUrlResolver
+                    .resolveToContextRoot(styleSheet.value());
+            if (resolved != null) {
+                page.addStyleSheet(resolved, styleSheet.loadMode());
+            }
+        });
 
         VaadinService service = session.getService();
         if (!service.getDeploymentConfiguration().isProductionMode()) {
-            dependencies.getStyleSheets()
-                    .forEach(styleSheet -> ActiveStyleSheetTracker.get(service)
-                            .trackAddForComponent(styleSheet.value()));
+            dependencies.getStyleSheets().forEach(styleSheet -> {
+                String resolved = FrontendDependencyUrlResolver
+                        .resolveToContextRoot(styleSheet.value());
+                if (resolved != null) {
+                    ActiveStyleSheetTracker.get(service)
+                            .trackAddForComponent(resolved);
+                }
+            });
         }
 
         warnForUnavailableBundledDependencies(componentClass, dependencies);
@@ -1109,9 +1120,11 @@ public class UIInternals implements Serializable {
         }
 
         List<String> jsDeps = new ArrayList<>();
-        jsDeps.addAll(dependencies.getJavaScripts().stream()
-                .map(dep -> dep.value()).filter(src -> !UrlUtil.isExternal(src))
-                .collect(Collectors.toList()));
+        jsDeps.addAll(
+                dependencies.getJavaScripts().stream().map(dep -> dep.value())
+                        .filter(src -> !FrontendDependencyUrlResolver
+                                .isRuntimeDependencyUrl(src))
+                        .collect(Collectors.toList()));
         jsDeps.addAll(dependencies.getJsModules().stream()
                 .map(dep -> dep.value()).filter(src -> !UrlUtil.isExternal(src))
                 .collect(Collectors.toList()));
@@ -1143,8 +1156,15 @@ public class UIInternals implements Serializable {
     private void addExternalDependencies(DependencyInfo dependency) {
         Page page = ui.getPage();
         dependency.getJavaScripts().stream()
-                .filter(js -> UrlUtil.isExternal(js.value()))
-                .forEach(js -> page.addJavaScript(js.value(), js.loadMode()));
+                .filter(js -> FrontendDependencyUrlResolver
+                        .isRuntimeDependencyUrl(js.value()))
+                .forEach(js -> {
+                    String resolved = FrontendDependencyUrlResolver
+                            .resolveToContextRoot(js.value());
+                    if (resolved != null) {
+                        page.addJavaScript(resolved, js.loadMode());
+                    }
+                });
         dependency.getJsModules().stream()
                 .filter(js -> UrlUtil.isExternal(js.value()))
                 .forEach(js -> page.addJsModule(js.value()));

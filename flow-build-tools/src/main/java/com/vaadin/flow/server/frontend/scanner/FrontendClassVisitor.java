@@ -31,6 +31,7 @@ import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.FrontendDependencyUrlResolver;
 import com.vaadin.flow.theme.NoTheme;
 import com.vaadin.flow.theme.Theme;
 
@@ -70,13 +71,16 @@ final class FrontendClassVisitor extends ClassVisitor {
         boolean currentDevOnly = false;
         private String currentModule;
 
-        private LinkedHashSet<String> target;
-        private LinkedHashSet<String> targetDevelopmentOnly;
+        private final LinkedHashSet<String> target;
+        private final LinkedHashSet<String> targetDevelopmentOnly;
+        private final boolean isJavaScriptAnnotation;
 
         public JSAnnotationVisitor(LinkedHashSet<String> target,
-                LinkedHashSet<String> targetDevelopmentOnly) {
+                LinkedHashSet<String> targetDevelopmentOnly,
+                boolean isJavaScriptAnnotation) {
             this.target = target;
             this.targetDevelopmentOnly = targetDevelopmentOnly;
+            this.isJavaScriptAnnotation = isJavaScriptAnnotation;
         }
 
         @Override
@@ -94,7 +98,7 @@ final class FrontendClassVisitor extends ClassVisitor {
         @Override
         public void visitEnd() {
             super.visitEnd();
-            if (currentModule != null) {
+            if (currentModule != null && !isRuntimeJavaScript(currentModule)) {
                 // This visitor is called also for the $Container annotation
                 if (currentDevOnly) {
                     targetDevelopmentOnly.add(currentModule);
@@ -104,6 +108,11 @@ final class FrontendClassVisitor extends ClassVisitor {
             }
             currentModule = null;
             currentDevOnly = false;
+        }
+
+        private boolean isRuntimeJavaScript(String value) {
+            return isJavaScriptAnnotation && FrontendDependencyUrlResolver
+                    .isRuntimeDependencyUrl(value);
         }
 
     }
@@ -226,10 +235,10 @@ final class FrontendClassVisitor extends ClassVisitor {
         };
         // Visitor for @JsModule annotations
         jsModuleVisitor = new JSAnnotationVisitor(classInfo.modules,
-                classInfo.modulesDevelopmentOnly);
+                classInfo.modulesDevelopmentOnly, false);
         // Visitor for @JavaScript annotations
         jScriptVisitor = new JSAnnotationVisitor(classInfo.scripts,
-                classInfo.scriptsDevelopmentOnly);
+                classInfo.scriptsDevelopmentOnly, true);
         // Visitor all other annotations
         annotationVisitor = new RepeatedAnnotationVisitor() {
             @Override

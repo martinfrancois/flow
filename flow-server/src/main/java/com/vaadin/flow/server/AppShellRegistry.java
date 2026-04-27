@@ -280,42 +280,14 @@ public class AppShellRegistry implements Serializable {
 
     private static String resolveStyleSheetHref(String href,
             VaadinRequest request) {
-        if (href == null || href.isBlank()) {
+        String normalized = FrontendDependencyUrlResolver
+                .resolveToContextRoot(href);
+        if (normalized == null) {
             return null;
-        }
-        if (HandlerHelper
-                .isPathUnsafe(href.startsWith("/") ? href : "/" + href)) {
-            log.warn(
-                    "@StyleSheet href containing traversals ('../') are not allowed, ignored: {}",
-                    href);
-            return null;
-        }
-        href = href.trim();
-        // Accept absolute http(s) URLs unchanged
-        String lower = href.toLowerCase();
-        if (lower.startsWith("http://") || lower.startsWith("https://")) {
-            return href;
-        }
-        // Treat ./ as relative path to static resources location
-        if (href.startsWith("./")) {
-            href = href.substring(2);
-        }
-        // Accept bare paths beginning with '/' as-is
-        if (href.startsWith("/")) {
-            return href;
-        }
-
-        String contextPath = request.getContextPath();
-        if (!contextPath.isEmpty()) {
-            String contextProtocol = ApplicationConstants.CONTEXT_PROTOCOL_PREFIX;
-            if (!lower.startsWith(contextProtocol)) {
-                // Prepend context protocol so URL is resolved with context path
-                href = contextProtocol + href;
-            }
         }
         BootstrapHandler.BootstrapUriResolver resolver = new BootstrapHandler.BootstrapUriResolver(
-                contextPath + "/", null);
-        return resolver.resolveVaadinUri(href);
+                request.getContextPath() + "/", null);
+        return resolver.resolveVaadinUri(normalized);
     }
 
     /**
