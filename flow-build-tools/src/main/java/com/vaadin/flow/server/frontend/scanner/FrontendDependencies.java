@@ -219,7 +219,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                 if (warnedJavaScriptKeys.add(className + ':' + value)) {
                     log().warn(
                             "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
-                                    + "Prepend context:// for runtime loading or migrate to @JsModule.",
+                                    + "Prepend context:// for a runtime <script> tag, set type=Type.MODULE for a runtime <script type=\"module\"> tag, or migrate to @JsModule for bundling.",
                             className, value);
                 }
             }
@@ -227,7 +227,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                 if (warnedJavaScriptKeys.add(className + ':' + value)) {
                     log().warn(
                             "@JavaScript on {} with value \"{}\" uses the deprecated bundled interpretation. "
-                                    + "Prepend context:// for runtime loading or migrate to @JsModule.",
+                                    + "Prepend context:// for a runtime <script> tag, set type=Type.MODULE for a runtime <script type=\"module\"> tag, or migrate to @JsModule for bundling.",
                             className, value);
                 }
             }
@@ -236,7 +236,7 @@ public class FrontendDependencies extends AbstractDependenciesScanner {
                     log().warn(
                             "@JsModule on {} with value \"{}\" is a runtime URL. "
                                     + "@JsModule is for build-time bundle sources only; "
-                                    + "use @JavaScript(\"{}\") for runtime script loading.",
+                                    + "use @JavaScript(value=\"{}\", type=Type.MODULE) for a runtime <script type=\"module\"> tag.",
                             className, value, value);
                 }
             }

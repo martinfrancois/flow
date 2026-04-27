@@ -1120,11 +1120,9 @@ public class UIInternals implements Serializable {
         }
 
         List<String> jsDeps = new ArrayList<>();
-        jsDeps.addAll(
-                dependencies.getJavaScripts().stream().map(dep -> dep.value())
-                        .filter(src -> !FrontendDependencyUrlResolver
-                                .isRuntimeDependencyUrl(src))
-                        .collect(Collectors.toList()));
+        jsDeps.addAll(dependencies.getJavaScripts().stream()
+                .filter(js -> !isRuntimeJavaScript(js)).map(dep -> dep.value())
+                .collect(Collectors.toList()));
         jsDeps.addAll(dependencies.getJsModules().stream()
                 .map(dep -> dep.value()).filter(src -> !UrlUtil.isExternal(src))
                 .collect(Collectors.toList()));
@@ -1155,19 +1153,28 @@ public class UIInternals implements Serializable {
 
     private void addExternalDependencies(DependencyInfo dependency) {
         Page page = ui.getPage();
-        dependency.getJavaScripts().stream()
-                .filter(js -> FrontendDependencyUrlResolver
-                        .isRuntimeDependencyUrl(js.value()))
+        dependency.getJavaScripts().stream().filter(this::isRuntimeJavaScript)
                 .forEach(js -> {
                     String resolved = FrontendDependencyUrlResolver
                             .resolveToContextRoot(js.value());
-                    if (resolved != null) {
+                    if (resolved == null) {
+                        return;
+                    }
+                    if (js.type() == JavaScript.Type.MODULE) {
+                        page.addJsModule(resolved);
+                    } else {
                         page.addJavaScript(resolved, js.loadMode());
                     }
                 });
         dependency.getJsModules().stream()
                 .filter(js -> UrlUtil.isExternal(js.value()))
                 .forEach(js -> page.addJsModule(js.value()));
+    }
+
+    private boolean isRuntimeJavaScript(JavaScript js) {
+        return js.type() == JavaScript.Type.MODULE
+                || FrontendDependencyUrlResolver
+                        .isRuntimeDependencyUrl(js.value());
     }
 
     /**

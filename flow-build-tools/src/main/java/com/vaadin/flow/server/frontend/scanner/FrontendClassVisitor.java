@@ -70,6 +70,7 @@ final class FrontendClassVisitor extends ClassVisitor {
 
         boolean currentDevOnly = false;
         private String currentModule;
+        private boolean currentTypeIsModule = false;
 
         private final LinkedHashSet<String> target;
         private final LinkedHashSet<String> targetDevelopmentOnly;
@@ -99,15 +100,24 @@ final class FrontendClassVisitor extends ClassVisitor {
         }
 
         @Override
+        public void visitEnum(String name, String descriptor, String value) {
+            if ("type".equals(name) && "MODULE".equals(value)) {
+                currentTypeIsModule = true;
+            }
+        }
+
+        @Override
         public void visitEnd() {
             super.visitEnd();
             if (currentModule != null) {
                 // This visitor is called also for the $Container annotation
                 boolean runtimeUrl = FrontendDependencyUrlResolver
                         .isRuntimeDependencyUrl(currentModule);
-                if (isJavaScriptAnnotation && runtimeUrl) {
-                    // @JavaScript with a runtime prefix: load at runtime, not
-                    // bundled. No deprecation — this is the recommended form.
+                if (isJavaScriptAnnotation
+                        && (runtimeUrl || currentTypeIsModule)) {
+                    // @JavaScript with a runtime prefix or type=MODULE: loaded
+                    // at runtime, not bundled. No deprecation — these are the
+                    // recommended forms.
                 } else if (!isJavaScriptAnnotation && runtimeUrl) {
                     // @JsModule with a runtime URL: keep working at runtime
                     // via Page.addJsModule, but skip from the bundle and warn
@@ -123,6 +133,7 @@ final class FrontendClassVisitor extends ClassVisitor {
             }
             currentModule = null;
             currentDevOnly = false;
+            currentTypeIsModule = false;
         }
 
     }

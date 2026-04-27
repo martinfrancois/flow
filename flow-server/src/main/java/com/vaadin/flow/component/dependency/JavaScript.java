@@ -28,8 +28,10 @@ import com.vaadin.flow.component.page.Page;
 import com.vaadin.flow.shared.ui.LoadMode;
 
 /**
- * Loads a JavaScript file into the browser at runtime as a {@code <script>}
- * element. The referenced file is served as a static resource by the servlet
+ * Loads a JavaScript file into the browser at runtime. By default the file is
+ * loaded as a classic {@code <script>} element; set {@link #type()} to
+ * {@link Type#MODULE} to load it as a {@code <script type="module">} element
+ * instead. The referenced file is served as a static resource by the servlet
  * container; it is not bundled. Use {@link JsModule} when the file should be
  * processed as a bundle source by Vite at build time.
  * <p>
@@ -45,6 +47,7 @@ import com.vaadin.flow.shared.ui.LoadMode;
  * {@code context://}, {@code base://}, absolute URLs, and bare relative paths
  * are all supported. Use {@code context://foo.js} to load
  * {@code META-INF/resources/foo.js} regardless of the Vaadin servlet mapping.
+ * External URLs ({@code https://cdn.example/foo.js}) work the same way.
  * <p>
  * For adding multiple JavaScript files for a single component, use this
  * annotation multiple times. It is guaranteed that dependencies will be loaded
@@ -52,14 +55,16 @@ import com.vaadin.flow.shared.ui.LoadMode;
  * <p>
  * <b>Deprecated bundled interpretation:</b> Historically, a bare relative URL
  * (e.g. {@code @JavaScript("./foo.js")}) was collected by the scanner and
- * bundled like {@link JsModule}. This behavior is deprecated. To opt into the
- * new runtime semantics, prefix the value with {@code context://},
- * {@code base://}, or start it with {@code /}. Bare-relative values still
- * bundle but emit a build-time warning. A future major release will flip the
- * default so that bare relatives also resolve against the context root.
+ * bundled like {@link JsModule}. This behavior is deprecated when
+ * {@link #type()} is the default {@link Type#SCRIPT}. To opt into runtime
+ * semantics, either prefix the value with {@code context://}, {@code base://},
+ * or {@code /}, or set {@link #type()} to {@link Type#MODULE}. Bare-relative
+ * SCRIPT-typed values still bundle but emit a build-time warning. A future
+ * major release will flip the default so bare relatives resolve against the
+ * context root.
  * <p>
- * NOTE: It's not possible to execute a function defined in a bundled JavaScript
- * module via
+ * NOTE: When loaded with {@link Type#MODULE} (or via {@link JsModule}), it is
+ * not possible to execute a function defined in the file via
  *
  * <pre>
  *
@@ -68,10 +73,11 @@ import com.vaadin.flow.shared.ui.LoadMode;
  * </code>
  * </pre>
  *
- * because the function is private there (unless it's explicitly exposed). The
- * JavaScript where the function is defined should be either external or it
- * should be added using {@link Page#addJavaScript(String)}: in this case all
- * declared functions become available in the global scope.
+ * because the function is private to the module (unless it's explicitly
+ * exposed). The JavaScript where the function is defined should be loaded with
+ * {@link Type#SCRIPT} (the default) or added using
+ * {@link Page#addJavaScript(String)}: in this case all declared functions
+ * become available in the global scope.
  *
  *
  * @author Vaadin Ltd
@@ -88,6 +94,23 @@ import com.vaadin.flow.shared.ui.LoadMode;
 public @interface JavaScript {
 
     /**
+     * The kind of {@code <script>} tag to render for the dependency.
+     */
+    enum Type {
+        /**
+         * Render a classic {@code <script>} tag. Functions declared in the
+         * loaded file become available in the global scope.
+         */
+        SCRIPT,
+        /**
+         * Render a {@code <script type="module">} tag. The loaded file is
+         * treated as an ES module: functions and variables declared in it are
+         * private to the module unless explicitly exported.
+         */
+        MODULE
+    }
+
+    /**
      * JavaScript file URL to load before using the annotated {@link Component}
      * in the browser.
      * <p>
@@ -101,15 +124,26 @@ public @interface JavaScript {
      * URI, i.e. the Vaadin servlet mapping path.</li>
      * <li>{@code /foo.js} — used unchanged as an absolute server path.</li>
      * <li>Any other value (bare relative, {@code "./foo.js"},
-     * {@code "../foo.js"}) is currently treated as a bundle source for
-     * backwards compatibility — see the deprecation notice on the class
-     * Javadoc. Migrate to {@code @JavaScript("context://foo.js")} for runtime
-     * loading or to {@link JsModule} for bundling.</li>
+     * {@code "../foo.js"}) — for {@link Type#SCRIPT} (default), treated as a
+     * bundle source for backwards compatibility (deprecated, see the class
+     * Javadoc). For {@link Type#MODULE}, normalized to
+     * {@code context://<value>} and loaded at runtime.</li>
      * </ul>
      *
      * @return a JavaScript file URL
      */
     String value();
+
+    /**
+     * The kind of {@code <script>} tag to use when loading the file. Defaults
+     * to {@link Type#SCRIPT}. Set to {@link Type#MODULE} to load the file as an
+     * ES module, e.g. for hand-authored or CDN-hosted modules that should not
+     * go through Vite. For build-time bundled ES modules use {@link JsModule}
+     * instead.
+     *
+     * @return the kind of script tag to render
+     */
+    Type type() default Type.SCRIPT;
 
     /**
      * Defines if the JavaScript should be loaded only when running in
@@ -126,6 +160,9 @@ public @interface JavaScript {
     /**
      * Determines the dependency load mode. Refer to {@link LoadMode} for the
      * details.
+     * <p>
+     * For {@link Type#MODULE}, only {@link LoadMode#EAGER} (the default) is
+     * supported; other values are ignored.
      *
      * @return load mode for the dependency
      */
